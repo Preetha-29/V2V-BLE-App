@@ -344,6 +344,7 @@ class MainActivity : AppCompatActivity() {
                             highlightTextView(receivedData)
                         }
                     }
+
                 }
             } else {
                 Log.e(TAG, "Characteristic read failed with status: $status")
@@ -354,21 +355,21 @@ class MainActivity : AppCompatActivity() {
     private fun highlightTextView(receivedData: String) {
         // Reset the previous highlighted TextView, if any
         lastHighlightedTextView?.setBackgroundResource(R.drawable.border)
-       // lastHighlightedTextView?.setBackgroundResource(0)
+        // lastHighlightedTextView?.setBackgroundResource(0)
         lastHighlightedTextView?.setTextColor(Color.WHITE)
 
         // Get the corresponding TextView based on the received data
         val textView = when (receivedData.toIntOrNull()) {
             1 -> findViewById<TextView>(R.id.textView1)
-            2 -> findViewById<TextView>(R.id.textView2)
-            3 -> findViewById<TextView>(R.id.textView3)
-            4 -> findViewById<TextView>(R.id.textView4)
-            5 -> findViewById<TextView>(R.id.textView5)
-            6 -> findViewById<TextView>(R.id.textView6)
-            7 -> findViewById<TextView>(R.id.textView7)
-            8 -> findViewById<TextView>(R.id.textView8)
-            9 -> findViewById<TextView>(R.id.textView9)
-            10 -> findViewById<TextView>(R.id.textView10)
+            // 2 -> findViewById<TextView>(R.id.textView2)
+            //3 -> findViewById<TextView>(R.id.textView3)
+            2 -> findViewById<TextView>(R.id.textView4)
+            3 -> findViewById<TextView>(R.id.textView5)
+            5 -> findViewById<TextView>(R.id.textView6)
+            6 -> findViewById<TextView>(R.id.textView7)
+            7 -> findViewById<TextView>(R.id.textView8)
+            4 -> findViewById<TextView>(R.id.textView9)
+            8 -> findViewById<TextView>(R.id.textView10)
             else -> null
         }
 
@@ -388,4 +389,3 @@ class MainActivity : AppCompatActivity() {
         const val TAG = "BluetoothApp"
     }
 }
-
