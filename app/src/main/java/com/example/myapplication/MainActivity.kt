@@ -11,6 +11,7 @@ import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
+import android.os.Handler
 import android.os.ParcelUuid
 import android.util.Log
 import android.widget.Button
@@ -34,9 +35,9 @@ class MainActivity : AppCompatActivity() {
     private var targetDevice: BluetoothDevice? = null // Add this variable to hold the target device
     private val POLLING_INTERVAL = 10 //Reading time interval
 
-    val targetMacAddress = "00:1E:C0:3E:1B:3C"  //For scanning using macAddress
-    private val SUUID = "6e400001-b5a3-f393-e0a9-e50e24dccA9e" // Replace with the OBU service UUID
-    private val CUUID = "6e400002-b5a3-f393-e0a9-e50e24dccA9e" // Replace with the OBU characteristic UUID
+    val targetMacAddress = "54:F8:2A:50:68:2A" //For scanning using macAddress
+    private val SUUID = "4906276B-DA6A-4A6C-BF94-73C61B96433C" // Replace with the OBU service UUID
+    private val CUUID = "49AF5250-F176-46C5-B99A-A163A672C042" // Replace with the OBU characteristic UUID
 
     //initialise UI
     private lateinit var bluetoothAdapter: BluetoothAdapter
@@ -76,12 +77,13 @@ class MainActivity : AppCompatActivity() {
 
         buttonOK.setOnClickListener {
             resetHighlighting()
+            lastHighlightedTextView?.setBackgroundResource(R.drawable.border)
         }
 
         buttonConnect = findViewById(R.id.buttonConnect)
         buttonDisconnect = findViewById(R.id.buttonDisconnect)
 
-        // Set click listeners for the Connect and Disconnect buttons
+// Set click listeners for the Connect and Disconnect buttons
         buttonConnect.setOnClickListener {
             targetDevice?.let { it -> connectToDevice(it) }
         }
@@ -90,26 +92,26 @@ class MainActivity : AppCompatActivity() {
             bluetoothGatt.disconnect()
         }
 
-        //portrait mode
+//portrait mode
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
 
-        //initialise bluetoothAdapter
+//initialise bluetoothAdapter
         bluetoothAdapter = (getSystemService(BLUETOOTH_SERVICE) as BluetoothManager).adapter
 
-        // Check if BLE is supported on the device
+// Check if BLE is supported on the device
         if (!packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
             showToast("BLE is not supported on this device.")
             Log.e(TAG, "BLE is not supported on this device.")
             finish()
         }
-        //if bluetoothAdapter is null
+//if bluetoothAdapter is null
         if (bluetoothAdapter == null || bluetoothAdapter.bluetoothLeScanner == null) {
             showToast("Bluetooth is not available on this device.")
             Log.e(TAG, "Bluetooth is not available on this device.")
             finish()
             return
         }
-        // Check if Bluetooth is enabled, and request the user to enable it if not
+// Check if Bluetooth is enabled, and request the user to enable it if not
         if (!bluetoothAdapter.isEnabled) {
             val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
             startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT)
@@ -128,7 +130,7 @@ class MainActivity : AppCompatActivity() {
 
     //check permissions
     private fun checkLocationPermission() {
-        // Check if the app has location permission, and request it if not
+// Check if the app has location permission, and request it if not
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED
         ) {
@@ -138,7 +140,7 @@ class MainActivity : AppCompatActivity() {
                 REQUEST_FINE_LOCATION_PERMISSION
             )
         }
-        // Request the BLUETOOTH_SCAN permission at runtime
+// Request the BLUETOOTH_SCAN permission at runtime
         if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.BLUETOOTH_SCAN
@@ -151,7 +153,7 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        // Request the BLUETOOTH_CONNECT permission at runtime
+// Request the BLUETOOTH_CONNECT permission at runtime
         if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.BLUETOOTH_CONNECT
@@ -164,7 +166,7 @@ class MainActivity : AppCompatActivity() {
             )
         }
         else {
-            //For scanning using macAddress
+//For scanning using macAddress
             startScanning(targetMacAddress)
 
         }
@@ -183,7 +185,7 @@ class MainActivity : AppCompatActivity() {
         when (requestCode) {
             REQUEST_FINE_LOCATION_PERMISSION -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    // Location permission granted.
+// Location permission granted.
                     startScanning(targetMacAddress)
                 } else {
                     showToast("Location permission denied. Your app may not work correctly.")
@@ -191,7 +193,7 @@ class MainActivity : AppCompatActivity() {
             }
             REQUEST_BLUETOOTH_SCAN_PERMISSION -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    //startScanning()
+//startScanning()
                     startScanning(targetMacAddress)
                 } else {
                     showToast("Bluetooth scan permission denied. Scanning cannot start.")
@@ -199,7 +201,7 @@ class MainActivity : AppCompatActivity() {
             }
             REQUEST_BLUETOOTH_CONNECT_PERMISSION -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    // Bluetooth connect permission granted.
+// Bluetooth connect permission granted.
 
                     targetDevice?.let { connectToDevice(it) }
                 } else {
@@ -213,8 +215,8 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    //For scanning using macAddress
-    //filter scan using mac address
+//For scanning using macAddress
+//filter scan using mac address
 
     @SuppressLint("MissingPermission")
     private fun startScanning(targetMacAddress: String) {
@@ -283,6 +285,7 @@ class MainActivity : AppCompatActivity() {
     }
     //gatt server communication
     private val gattCallback = object : BluetoothGattCallback() {
+        private val RECONNECT_DELAY_MS = 1000 // 1 seconds delay
         @SuppressLint("MissingPermission")
         override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
             runOnUiThread {
@@ -293,6 +296,13 @@ class MainActivity : AppCompatActivity() {
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     showToast("Disconnected from OBU.")
                     Log.e(TAG, "Disconnected from OBU.")
+              // Attempt to auto reconnect with a time delay
+                    val device = targetDevice // Replace with the stored BluetoothDevice
+                    device?.let {
+                        Handler().postDelayed({
+                            connectToDevice(it)
+                        }, RECONNECT_DELAY_MS.toLong())
+                    }
                 }
             }
         }
@@ -313,11 +323,11 @@ class MainActivity : AppCompatActivity() {
         //read periodically
         @SuppressLint("MissingPermission")
         private fun startPolling(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
-            // Create a scheduled executor to read the data periodically
+// Create a scheduled executor to read the data periodically
             val executor = Executors.newSingleThreadScheduledExecutor()
             executor.scheduleAtFixedRate(
                 {
-                    // Read the characteristic value
+// Read the characteristic value
                     gatt.readCharacteristic(characteristic)
                 },
                 0, POLLING_INTERVAL.toLong(), TimeUnit.MILLISECONDS
@@ -333,7 +343,7 @@ class MainActivity : AppCompatActivity() {
                 val data = characteristic?.value
                 data?.let {
                     val receivedData = data.toString(Charsets.UTF_8)
-                    // Display the received data in your app's UI
+// Display the received data in your app's UI
                     runOnUiThread {
                         if (receivedData == "0") {
                             resetHighlighting()
@@ -353,16 +363,16 @@ class MainActivity : AppCompatActivity() {
     }
     //highlight text
     private fun highlightTextView(receivedData: String) {
-        // Reset the previous highlighted TextView, if any
+// Reset the previous highlighted TextView, if any
         lastHighlightedTextView?.setBackgroundResource(R.drawable.border)
-        // lastHighlightedTextView?.setBackgroundResource(0)
+// lastHighlightedTextView?.setBackgroundResource(0)
         lastHighlightedTextView?.setTextColor(Color.WHITE)
 
-        // Get the corresponding TextView based on the received data
+// Get the corresponding TextView based on the received data
         val textView = when (receivedData.toIntOrNull()) {
             1 -> findViewById<TextView>(R.id.textView1)
-            // 2 -> findViewById<TextView>(R.id.textView2)
-            //3 -> findViewById<TextView>(R.id.textView3)
+// 2 -> findViewById<TextView>(R.id.textView2)
+//3 -> findViewById<TextView>(R.id.textView3)
             2 -> findViewById<TextView>(R.id.textView4)
             3 -> findViewById<TextView>(R.id.textView5)
             5 -> findViewById<TextView>(R.id.textView6)
@@ -379,7 +389,7 @@ class MainActivity : AppCompatActivity() {
             setTextColor(Color.WHITE)
         }
 
-        // Update the lastHighlightedTextView reference
+// Update the lastHighlightedTextView reference
         lastHighlightedTextView = textView
     }
 
